@@ -1,5 +1,6 @@
 package com.example.deliveryapp.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,12 +11,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.deliveryapp.data.model.Product
+import com.example.deliveryapp.viewmodel.ProductSearchViewModel
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductSearchScreen(
-    viewModel: ProductSearchViewModel = viewModel()
+    viewModel: ProductSearchViewModel = viewModel(),
+    onProductClick: (String) -> Unit = {}  // Add callback for product clicks
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -51,9 +54,20 @@ fun ProductSearchScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Items in cart: ${uiState.cart.size}")
+                        Column {
+                            Text(
+                                "Items in cart: ${uiState.cart.size}",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                "Total: $${String.format("%.2f", uiState.cart.sumOf { it.subtotal })}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                         Button(
                             onClick = {
                                 viewModel.placeOrder("shopper1", "123 Main St")
@@ -83,7 +97,8 @@ fun ProductSearchScreen(
                 items(uiState.products) { product ->
                     ProductCard(
                         product = product,
-                        onAddToCart = { viewModel.addToCart(product, 1) }
+                        onAddToCart = { viewModel.addToCart(product, 1) },
+                        onClick = { onProductClick(product.id) }  // Pass click to navigation
                     )
                 }
             }
@@ -94,10 +109,13 @@ fun ProductSearchScreen(
 @Composable
 fun ProductCard(
     product: Product,
-    onAddToCart: () -> Unit
+    onAddToCart: () -> Unit,
+    onClick: () -> Unit = {}  // Add click handler
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }  // Make entire card clickable
     ) {
         Row(
             modifier = Modifier
@@ -111,17 +129,26 @@ fun ProductCard(
                     text = product.name,
                     style = MaterialTheme.typography.titleMedium
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = product.category,
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "$${product.price}",
-                    style = MaterialTheme.typography.titleSmall
+                    text = "$${String.format("%.2f", product.price)}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
 
-            Button(onClick = onAddToCart) {
+            // Add to Cart button (stops click propagation)
+            Button(
+                onClick = {
+                    onAddToCart()
+                }
+            ) {
                 Text("Add to Cart")
             }
         }

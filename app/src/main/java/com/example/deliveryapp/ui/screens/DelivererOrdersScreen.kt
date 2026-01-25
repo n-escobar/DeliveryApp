@@ -1,95 +1,17 @@
-package com.example.deliveryapp.ui.screens
+package com.example.deliveryapp
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.deliveryapp.data.model.Order
 import com.example.deliveryapp.data.model.OrderStatus
-import com.example.deliveryapp.data.repository.OrderRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-
-data class DelivererOrdersUiState(
-    val assignedOrders: List<Order> = emptyList(),
-    val availableOrders: List<Order> = emptyList(),
-    val isLoading: Boolean = false,
-    val error: String? = null
-)
-
-class DelivererOrdersViewModel : ViewModel() {
-    private val orderRepository = OrderRepository()
-    private val currentDelivererId = "deliverer1"
-
-    private val _uiState = MutableStateFlow(DelivererOrdersUiState())
-    val uiState: StateFlow<DelivererOrdersUiState> = _uiState.asStateFlow()
-
-    init {
-        loadOrders()
-    }
-
-    fun loadOrders() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-
-            val availableResult = orderRepository.getAvailableOrdersForDelivery()
-            val assignedResult = orderRepository.getOrdersForDeliverer(currentDelivererId)
-
-            if (availableResult.isSuccess && assignedResult.isSuccess) {
-                _uiState.value = _uiState.value.copy(
-                    availableOrders = availableResult.getOrNull() ?: emptyList(),
-                    assignedOrders = assignedResult.getOrNull() ?: emptyList(),
-                    isLoading = false
-                )
-            } else {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = "Failed to load orders"
-                )
-            }
-        }
-    }
-
-    fun acceptOrder(orderId: String) {
-        viewModelScope.launch {
-            orderRepository.assignDeliverer(orderId, currentDelivererId)
-                .onSuccess { loadOrders() }
-                .onFailure { exception ->
-                    _uiState.value = _uiState.value.copy(
-                        error = exception.message
-                    )
-                }
-        }
-    }
-
-    fun markAsPickedUp(orderId: String) {
-        updateOrderStatus(orderId, OrderStatus.OUT_FOR_DELIVERY)
-    }
-
-    fun markAsDelivered(orderId: String) {
-        updateOrderStatus(orderId, OrderStatus.DELIVERED)
-    }
-
-    private fun updateOrderStatus(orderId: String, status: OrderStatus) {
-        viewModelScope.launch {
-            orderRepository.updateOrderStatus(orderId, status)
-                .onSuccess { loadOrders() }
-                .onFailure { exception ->
-                    _uiState.value = _uiState.value.copy(
-                        error = exception.message
-                    )
-                }
-        }
-    }
-}
+import com.example.deliveryapp.viewmodel.DelivererOrdersViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -132,7 +54,7 @@ fun DelivererOrdersScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    contentAlignment = androidx.compose.ui.Alignment.Center
+                    contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
                 }

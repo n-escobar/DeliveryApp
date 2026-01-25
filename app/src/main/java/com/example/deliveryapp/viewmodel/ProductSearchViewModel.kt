@@ -1,8 +1,12 @@
-package com.example.deliveryapp.ui.screens
+package com.example.deliveryapp.viewmodel
 
+import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.deliveryapp.data.model.*
+import com.example.deliveryapp.data.model.Order
+import com.example.deliveryapp.data.model.OrderItem
+import com.example.deliveryapp.data.model.OrderStatus
+import com.example.deliveryapp.data.model.Product
 import com.example.deliveryapp.data.repository.OrderRepository
 import com.example.deliveryapp.data.repository.ProductRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -81,15 +85,19 @@ class ProductSearchViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
 
-            val order = Order(
-                orderId = "ORD${System.currentTimeMillis()}",
-                shopperId = shopperId,
-                items = _uiState.value.cart,
-                status = OrderStatus.PENDING,
-                totalPrice = _uiState.value.cart.sumOf { it.subtotal },
-                deliveryAddress = deliveryAddress,
-                createdAt = Instant.now()
-            )
+            val order = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Order(
+                    orderId = "ORD${System.currentTimeMillis()}",
+                    shopperId = shopperId,
+                    items = _uiState.value.cart,
+                    status = OrderStatus.PENDING,
+                    totalPrice = _uiState.value.cart.sumOf { it.subtotal },
+                    deliveryAddress = deliveryAddress,
+                    createdAt = Instant.now()
+                )
+            } else {
+                TODO("VERSION.SDK_INT < O")
+            }
 
             orderRepository.createOrder(order)
                 .onSuccess {

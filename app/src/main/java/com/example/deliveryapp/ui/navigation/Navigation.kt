@@ -9,28 +9,45 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.example.deliveryapp.DelivererOrdersScreen
 import com.example.deliveryapp.ui.screens.*
+import com.example.deliveryapp.viewmodel.ProductSearchViewModel
 
 sealed class Screen(val route: String, val title: String) {
     object ProductSearch : Screen("products", "Products")
     object ShopperOrders : Screen("shopper_orders", "My Orders")
     object DelivererOrders : Screen("deliverer_orders", "Deliveries")
+    object ProductDetail : Screen("product_detail/{productId}", "Product Details") {
+        fun createRoute(productId: String) = "product_detail/$productId"
+    }
 }
 
 @Composable
 fun AppNavigation(userRole: String = "SHOPPER") {
     val navController = rememberNavController()
+    // Shared ViewModel for cart management across screens
+    val productSearchViewModel: ProductSearchViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 
     Scaffold(
         bottomBar = {
-            BottomNavigationBar(
-                navController = navController,
-                userRole = userRole
+            // Only show bottom bar on main screens, not on detail screen
+            val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+            val showBottomBar = currentRoute !in listOf(
+                Screen.ProductDetail.route
             )
+
+            if (showBottomBar) {
+                BottomNavigationBar(
+                    navController = navController,
+                    userRole = userRole
+                )
+            }
         }
     ) { padding ->
         NavHost(
@@ -43,13 +60,36 @@ fun AppNavigation(userRole: String = "SHOPPER") {
             modifier = Modifier.padding(padding)
         ) {
             composable(Screen.ProductSearch.route) {
-                ProductSearchScreen()
+                ProductSearchScreen(
+                    viewModel = productSearchViewModel,
+                    onProductClick = { productId ->
+                        navController.navigate(Screen.ProductDetail.createRoute(productId))
+                    }
+                )
             }
+
             composable(Screen.ShopperOrders.route) {
                 ShopperOrdersScreen()
             }
+
             composable(Screen.DelivererOrders.route) {
                 DelivererOrdersScreen()
+            }
+
+            composable(
+                route = Screen.ProductDetail.route,
+                arguments = listOf(
+                    navArgument("productId") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val productId = backStackEntry.arguments?.getString("productId") ?: ""
+                ProductDetailScreen(
+                    productId = productId,
+                    onNavigateBack = { navController.popBackStack() },
+                    onAddToCart = { product, quantity ->
+                        productSearchViewModel.addToCart(product, quantity)
+                    }
+                )
             }
         }
     }

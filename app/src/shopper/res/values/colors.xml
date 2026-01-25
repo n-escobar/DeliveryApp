@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="flavor_primary">#2196F3</color>
+    <color name="flavor_primary_variant">#1976D2</color>
+    <color name="flavor_secondary">#03DAC5</color>
+</resources>

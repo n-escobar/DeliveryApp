@@ -81,6 +81,14 @@ fun ShopperNavigation() {
                     viewModel = productSearchViewModel,  // Pass the same instance
                     onProductClick = { productId ->
                         navController.navigate(ShopperScreen.ProductDetail.createRoute(productId))
+                    },
+                    onNavigateToOrders = {  // ← ADD THIS
+                        navController.navigate(ShopperScreen.Orders.route) {
+                            popUpTo(ShopperScreen.ProductSearch.route) {
+                                inclusive = false
+                            }
+                            launchSingleTop = true
+                        }
                     }
                 )
             }

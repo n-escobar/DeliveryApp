@@ -20,7 +20,9 @@ data class ProductSearchUiState(
     val searchQuery: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
-    val cart: List<OrderItem> = emptyList()
+    val cart: List<OrderItem> = emptyList(),
+    val orderPlaced: Boolean = false,  // ← ADD THIS
+    val lastOrderId: String? = null    // ← ADD THIS
 )
 
 class ProductSearchViewModel : ViewModel() {
@@ -81,9 +83,18 @@ class ProductSearchViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(cart = currentCart)
     }
 
+    // ← UPDATE THIS FUNCTION
     fun placeOrder(shopperId: String, deliveryAddress: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            // Validate cart is not empty
+            if (_uiState.value.cart.isEmpty()) {
+                _uiState.value = _uiState.value.copy(
+                    error = "Cart is empty"
+                )
+                return@launch
+            }
+
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             val order = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 Order(
@@ -100,12 +111,37 @@ class ProductSearchViewModel : ViewModel() {
             }
 
             orderRepository.createOrder(order)
-                .onSuccess {
+                .onSuccess { createdOrder ->
+                    println("DEBUG: Order created successfully: ${createdOrder.orderId}")
+
                     _uiState.value = _uiState.value.copy(
                         cart = emptyList(),
-                        isLoading = false
+                        isLoading = false,
+                        orderPlaced = true,
+                        lastOrderId = createdOrder.orderId
+                    )
+                }
+                .onFailure { exception ->
+                    println("DEBUG: Order creation failed: ${exception.message}")
+
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = exception.message ?: "Failed to place order"
                     )
                 }
         }
+    }
+
+    // ← ADD THIS FUNCTION
+    fun clearOrderPlacedFlag() {
+        _uiState.value = _uiState.value.copy(
+            orderPlaced = false,
+            lastOrderId = null
+        )
+    }
+
+    // ← ADD THIS FUNCTION
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(error = null)
     }
 }

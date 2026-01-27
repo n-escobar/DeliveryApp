@@ -17,89 +17,191 @@ import com.example.deliveryapp.viewmodel.ProductSearchViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductSearchScreen(
-    viewModel: ProductSearchViewModel = viewModel(),
-    onProductClick: (String) -> Unit = {}  // Add callback for product clicks
+    viewModel: ProductSearchViewModel,
+    onProductClick: (String) -> Unit = {},
+    onNavigateToOrders: () -> Unit = {}  // ← ADD THIS PARAMETER
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // Handle order placed success
+    LaunchedEffect(uiState.orderPlaced) {
+        if (uiState.orderPlaced) {
+            // Navigate to orders screen after short delay
+            kotlinx.coroutines.delay(1500)
+            viewModel.clearOrderPlacedFlag()
+            onNavigateToOrders()
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Search Products") }
             )
+        },
+        snackbarHost = {
+            // Show error snackbar if there's an error
+            uiState.error?.let { error ->
+                Snackbar(
+                    modifier = Modifier.padding(16.dp),
+                    action = {
+                        TextButton(onClick = { viewModel.clearError() }) {
+                            Text("Dismiss")
+                        }
+                    }
+                ) {
+                    Text(error)
+                }
+            }
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-        ) {
-            // Search Bar
-            OutlinedTextField(
-                value = uiState.searchQuery,
-                onValueChange = { viewModel.onSearchQueryChanged(it) },
-                label = { Text("Search products") },
-                modifier = Modifier.fillMaxWidth()
-            )
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(16.dp)
+            ) {
+                // Search Bar
+                OutlinedTextField(
+                    value = uiState.searchQuery,
+                    onValueChange = { viewModel.onSearchQueryChanged(it) },
+                    label = { Text("Search products") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isLoading
+                )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            // Cart Info
-            if (uiState.cart.isNotEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                // Cart Info
+                if (uiState.cart.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column {
-                            Text(
-                                "Items in cart: ${uiState.cart.size}",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Text(
-                                "Total: $${String.format("%.2f", uiState.cart.sumOf { it.subtotal })}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Button(
-                            onClick = {
-                                viewModel.placeOrder("shopper1", "123 Main St")
-                            }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
                         ) {
-                            Text("Place Order")
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        "Items in cart: ${uiState.cart.size}",
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Text(
+                                        "Total: $${String.format("%.2f", uiState.cart.sumOf { it.subtotal })}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Cart Items List
+                            uiState.cart.forEach { item ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        "${item.quantity}x ${item.productName}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        "$${String.format("%.2f", item.subtotal)}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Place Order Button
+                            Button(
+                                onClick = {
+                                    viewModel.placeOrder("shopper1", "123 Main St")
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !uiState.isLoading
+                            ) {
+                                if (uiState.isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text("Place Order")
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                // Product List
+                if (uiState.isLoading && uiState.cart.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(uiState.products) { product ->
+                            ProductCard(
+                                product = product,
+                                onAddToCart = { viewModel.addToCart(product, 1) },
+                                onClick = { onProductClick(product.id) }
+                            )
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // Loading State
-            if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-
-            // Product List
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(uiState.products) { product ->
-                    ProductCard(
-                        product = product,
-                        onAddToCart = { viewModel.addToCart(product, 1) },
-                        onClick = { onProductClick(product.id) }  // Pass click to navigation
+            // Success message overlay
+            if (uiState.orderPlaced) {
+                Card(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(32.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
                     )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "✓ Order Placed!",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Order #${uiState.lastOrderId}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Redirecting to orders...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                 }
             }
         }
@@ -110,12 +212,12 @@ fun ProductSearchScreen(
 fun ProductCard(
     product: Product,
     onAddToCart: () -> Unit,
-    onClick: () -> Unit = {}  // Add click handler
+    onClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }  // Make entire card clickable
+            .clickable { onClick() }
     ) {
         Row(
             modifier = Modifier
@@ -143,12 +245,7 @@ fun ProductCard(
                 )
             }
 
-            // Add to Cart button (stops click propagation)
-            Button(
-                onClick = {
-                    onAddToCart()
-                }
-            ) {
+            Button(onClick = onAddToCart) {
                 Text("Add to Cart")
             }
         }

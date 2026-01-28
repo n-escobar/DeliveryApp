@@ -21,13 +21,13 @@ data class ProductSearchUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val cart: List<OrderItem> = emptyList(),
-    val orderPlaced: Boolean = false,  // ← ADD THIS
-    val lastOrderId: String? = null    // ← ADD THIS
+    val orderPlaced: Boolean = false,
+    val lastOrderId: String? = null
 )
 
 class ProductSearchViewModel : ViewModel() {
     private val productRepository = ProductRepository()
-    private val orderRepository = OrderRepository()
+    private val orderRepository = OrderRepository.getInstance() // Use singleton
 
     private val _uiState = MutableStateFlow(ProductSearchUiState())
     val uiState: StateFlow<ProductSearchUiState> = _uiState.asStateFlow()
@@ -83,7 +83,6 @@ class ProductSearchViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(cart = currentCart)
     }
 
-    // ← UPDATE THIS FUNCTION
     fun placeOrder(shopperId: String, deliveryAddress: String) {
         viewModelScope.launch {
             // Validate cart is not empty
@@ -96,8 +95,7 @@ class ProductSearchViewModel : ViewModel() {
 
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            val order = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                Order(
+            val order = Order(
                     orderId = "ORD${System.currentTimeMillis()}",
                     shopperId = shopperId,
                     items = _uiState.value.cart,
@@ -106,13 +104,10 @@ class ProductSearchViewModel : ViewModel() {
                     deliveryAddress = deliveryAddress,
                     createdAt = Instant.now()
                 )
-            } else {
-                TODO("VERSION.SDK_INT < O")
-            }
+
 
             orderRepository.createOrder(order)
                 .onSuccess { createdOrder ->
-                    println("DEBUG: Order created successfully: ${createdOrder.orderId}")
 
                     _uiState.value = _uiState.value.copy(
                         cart = emptyList(),
@@ -122,7 +117,6 @@ class ProductSearchViewModel : ViewModel() {
                     )
                 }
                 .onFailure { exception ->
-                    println("DEBUG: Order creation failed: ${exception.message}")
 
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -132,7 +126,6 @@ class ProductSearchViewModel : ViewModel() {
         }
     }
 
-    // ← ADD THIS FUNCTION
     fun clearOrderPlacedFlag() {
         _uiState.value = _uiState.value.copy(
             orderPlaced = false,
@@ -140,7 +133,6 @@ class ProductSearchViewModel : ViewModel() {
         )
     }
 
-    // ← ADD THIS FUNCTION
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }

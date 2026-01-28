@@ -21,9 +21,16 @@ fun ShopperOrdersScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Reload orders when screen appears
+    // KEY FIX: Reload orders every time the screen appears
+    // Use a key that changes to force reload
     LaunchedEffect(Unit) {
         viewModel.loadOrders()
+    }
+
+    // ADDITIONAL FIX: Add a DisposableEffect to reload when returning to this screen
+    DisposableEffect(Unit) {
+        viewModel.loadOrders()
+        onDispose { }
     }
 
     Scaffold(
@@ -100,15 +107,68 @@ fun OrderCard(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Order #${order.orderId}", style = MaterialTheme.typography.titleMedium)
-            Text("Status: ${order.status}")
-            Text("Total: $${order.totalPrice}")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    "Order #${order.orderId}",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    "$${String.format("%.2f", order.totalPrice)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Status Badge
+            Surface(
+                color = when (order.status) {
+                    OrderStatus.PENDING -> MaterialTheme.colorScheme.tertiary
+                    OrderStatus.CONFIRMED -> MaterialTheme.colorScheme.primary
+                    OrderStatus.PREPARING -> MaterialTheme.colorScheme.secondary
+                    OrderStatus.READY_FOR_PICKUP -> MaterialTheme.colorScheme.primaryContainer
+                    OrderStatus.OUT_FOR_DELIVERY -> MaterialTheme.colorScheme.primary
+                    OrderStatus.DELIVERED -> MaterialTheme.colorScheme.outline
+                    OrderStatus.CANCELLED -> MaterialTheme.colorScheme.error
+                },
+                shape = MaterialTheme.shapes.small
+            ) {
+                Text(
+                    text = order.status.toString().replace("_", " "),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = when (order.status) {
+                        OrderStatus.CANCELLED -> MaterialTheme.colorScheme.onError
+                        else -> MaterialTheme.colorScheme.onPrimary
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text("Delivery: ${order.deliveryAddress}")
             Text("Items: ${order.items.size}")
 
+            // Show item details
+            order.items.forEach { item ->
+                Text(
+                    "• ${item.quantity}x ${item.productName} - $${String.format("%.2f", item.subtotal)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 8.dp, top = 4.dp)
+                )
+            }
+
             if (order.status == OrderStatus.PENDING) {
+                Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = onCancel,
-                    modifier = Modifier.padding(top = 8.dp)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
                 ) {
                     Text("Cancel Order")
                 }

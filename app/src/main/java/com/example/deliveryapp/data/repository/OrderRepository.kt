@@ -4,7 +4,19 @@ import com.example.deliveryapp.data.model.*
 import kotlinx.coroutines.delay
 import java.time.Instant
 
-class OrderRepository {
+class OrderRepository private constructor() {
+
+    companion object {
+        @Volatile
+        private var instance: OrderRepository? = null
+
+        fun getInstance(): OrderRepository {
+            return instance ?: synchronized(this) {
+                instance ?: OrderRepository().also { instance = it }
+            }
+        }
+    }
+
     private val orders = mutableListOf(
         // Shopper orders
         Order(
@@ -62,7 +74,11 @@ class OrderRepository {
 
     suspend fun getOrdersForShopper(shopperId: String): Result<List<Order>> {
         delay(300)
-        return Result.success(orders.filter { it.shopperId == shopperId })
+        val shopperOrders = orders.filter { it.shopperId == shopperId }
+        shopperOrders.forEach {
+            println("  - Order ${it.orderId}: ${it.status}, items: ${it.items.size}")
+        }
+        return Result.success(shopperOrders)
     }
 
     suspend fun createOrder(order: Order): Result<Order> {
@@ -80,8 +96,6 @@ class OrderRepository {
         orders[index] = updated
         return Result.success(updated)
     }
-
-    // Add to existing OrderRepository class
 
     suspend fun getAvailableOrdersForDelivery(): Result<List<Order>> {
         delay(300)
@@ -111,5 +125,29 @@ class OrderRepository {
         )
         orders[index] = updated
         return Result.success(updated)
+    }
+
+    /**
+     * Get all orders that need preparation (not yet ready for pickup)
+     * These are orders that deliverer needs to prepare
+     */
+    suspend fun getPendingOrders(): Result<List<Order>> {
+        delay(300)
+        val pending = orders.filter {
+            it.status in listOf(
+                OrderStatus.PENDING,
+                OrderStatus.CONFIRMED,
+                OrderStatus.PREPARING
+            )
+        }
+        return Result.success(pending)
+    }
+
+    /**
+     * Get all orders regardless of status (for admin/management view)
+     */
+    suspend fun getAllOrders(): Result<List<Order>> {
+        delay(300)
+        return Result.success(orders.toList())
     }
 }

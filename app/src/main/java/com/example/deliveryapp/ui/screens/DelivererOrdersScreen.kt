@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.deliveryapp.data.model.Order
 import com.example.deliveryapp.data.model.OrderStatus
 import com.example.deliveryapp.viewmodel.DelivererOrdersViewModel
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,9 +21,28 @@ fun DelivererOrdersScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // Auto-refresh every 5 seconds to catch new orders
+    LaunchedEffect(Unit) {
+        while (true) {
+            viewModel.loadOrders()
+            delay(5000)
+        }
+    }
+
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Delivery Dashboard") })
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Delivery Dashboard")
+                        Text(
+                            "Auto-refreshing every 5s",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            )
         }
     ) { padding ->
         Column(
@@ -40,11 +60,22 @@ fun DelivererOrdersScreen(
                         containerColor = MaterialTheme.colorScheme.errorContainer
                     )
                 ) {
-                    Text(
-                        text = error,
-                        modifier = Modifier.padding(16.dp),
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = error,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = { viewModel.clearError() }) {
+                            Text("Dismiss")
+                        }
+                    }
                 }
             }
 
@@ -60,16 +91,20 @@ fun DelivererOrdersScreen(
                 }
             }
 
-            // Tabs for Available and Assigned Orders
+            // Three tabs: Preparation, Available, My Deliveries
             var selectedTab by remember { mutableStateOf(0) }
-            val tabs = listOf("Available Orders", "My Deliveries")
+            val tabs = listOf(
+                "Preparation (${uiState.pendingOrders.size})",
+                "Available (${uiState.availableOrders.size})",
+                "My Deliveries (${uiState.assignedOrders.size})"
+            )
 
             TabRow(selectedTabIndex = selectedTab) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
-                        text = { Text(title) }
+                        text = { Text(title, maxLines = 1) }
                     )
                 }
             }
@@ -83,12 +118,32 @@ fun DelivererOrdersScreen(
             ) {
                 when (selectedTab) {
                     0 -> {
-                        // Available Orders Tab
+                        // Preparation Tab - Orders that need to be prepared
+                        if (uiState.pendingOrders.isEmpty()) {
+                            item {
+                                EmptyStateCard(
+                                    title = "No orders to prepare",
+                                    message = "New orders from shoppers will appear here"
+                                )
+                            }
+                        } else {
+                            items(uiState.pendingOrders) { order ->
+                                PreparationOrderCard(
+                                    order = order,
+                                    onConfirm = { viewModel.confirmOrder(order.orderId) },
+                                    onStartPreparing = { viewModel.startPreparing(order.orderId) },
+                                    onMarkReady = { viewModel.markReadyForPickup(order.orderId) }
+                                )
+                            }
+                        }
+                    }
+                    1 -> {
+                        // Available Orders Tab - Ready for pickup
                         if (uiState.availableOrders.isEmpty()) {
                             item {
-                                Text(
-                                    "No available orders",
-                                    modifier = Modifier.padding(16.dp)
+                                EmptyStateCard(
+                                    title = "No available orders",
+                                    message = "Orders marked as ready will appear here for delivery"
                                 )
                             }
                         } else {
@@ -100,13 +155,13 @@ fun DelivererOrdersScreen(
                             }
                         }
                     }
-                    1 -> {
+                    2 -> {
                         // Assigned Orders Tab
                         if (uiState.assignedOrders.isEmpty()) {
                             item {
-                                Text(
-                                    "No assigned deliveries",
-                                    modifier = Modifier.padding(16.dp)
+                                EmptyStateCard(
+                                    title = "No assigned deliveries",
+                                    message = "Accept orders from the Available tab to start delivering"
                                 )
                             }
                         } else {
@@ -126,6 +181,149 @@ fun DelivererOrdersScreen(
 }
 
 @Composable
+fun EmptyStateCard(title: String, message: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun PreparationOrderCard(
+    order: Order,
+    onConfirm: () -> Unit,
+    onStartPreparing: () -> Unit,
+    onMarkReady: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = when (order.status) {
+                OrderStatus.PENDING -> MaterialTheme.colorScheme.tertiaryContainer
+                OrderStatus.CONFIRMED -> MaterialTheme.colorScheme.secondaryContainer
+                OrderStatus.PREPARING -> MaterialTheme.colorScheme.primaryContainer
+                else -> MaterialTheme.colorScheme.surface
+            }
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        "Order #${order.orderId}",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    // Status Badge
+                    Surface(
+                        color = when (order.status) {
+                            OrderStatus.PENDING -> MaterialTheme.colorScheme.tertiary
+                            OrderStatus.CONFIRMED -> MaterialTheme.colorScheme.secondary
+                            OrderStatus.PREPARING -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.outline
+                        },
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            text = when (order.status) {
+                                OrderStatus.PENDING -> "🆕 NEW ORDER"
+                                OrderStatus.CONFIRMED -> "✓ CONFIRMED"
+                                OrderStatus.PREPARING -> "👨‍🍳 PREPARING"
+                                else -> order.status.toString()
+                            },
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
+                Text(
+                    "$${String.format("%.2f", order.totalPrice)}",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Order Details
+            Text("📍 ${order.deliveryAddress}", style = MaterialTheme.typography.bodyMedium)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("📦 ${order.items.size} items", style = MaterialTheme.typography.bodySmall)
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Item List
+            Text(
+                "Items to prepare:",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            order.items.forEach { item ->
+                Text(
+                    "• ${item.quantity}x ${item.productName}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 8.dp, top = 2.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Action Buttons based on status
+            when (order.status) {
+                OrderStatus.PENDING -> {
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Confirm Order")
+                    }
+                }
+                OrderStatus.CONFIRMED -> {
+                    Button(
+                        onClick = onStartPreparing,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Start Preparing")
+                    }
+                }
+                OrderStatus.PREPARING -> {
+                    Button(
+                        onClick = onMarkReady,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Mark Ready for Pickup")
+                    }
+                }
+                else -> {}
+            }
+        }
+    }
+}
+
+@Composable
 fun AvailableOrderCard(
     order: Order,
     onAccept: () -> Unit
@@ -139,28 +337,40 @@ fun AvailableOrderCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Column {
+                    Text(
+                        "Order #${order.orderId}",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondary,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            "✓ READY FOR PICKUP",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondary
+                        )
+                    }
+                }
                 Text(
-                    "Order #${order.orderId}",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    "${order.totalPrice}",
-                    style = MaterialTheme.typography.titleMedium,
+                    "$${String.format("%.2f", order.totalPrice)}",
+                    style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text("📍 ${order.deliveryAddress}", style = MaterialTheme.typography.bodyMedium)
+            Text("📦 ${order.items.size} items", style = MaterialTheme.typography.bodySmall)
+
             Spacer(modifier = Modifier.height(8.dp))
 
-            Text("Delivery: ${order.deliveryAddress}")
-            Text("Items: ${order.items.size}")
-            Text("Status: ${order.status}")
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Item Details
             order.items.forEach { item ->
                 Text(
                     "• ${item.quantity}x ${item.productName}",
@@ -190,7 +400,6 @@ fun AssignedOrderCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = when (order.status) {
-                OrderStatus.READY_FOR_PICKUP -> MaterialTheme.colorScheme.tertiaryContainer
                 OrderStatus.OUT_FOR_DELIVERY -> MaterialTheme.colorScheme.primaryContainer
                 OrderStatus.DELIVERED -> MaterialTheme.colorScheme.surfaceVariant
                 else -> MaterialTheme.colorScheme.surface
@@ -207,7 +416,7 @@ fun AssignedOrderCard(
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(
-                    "${order.totalPrice}",
+                    "$${String.format("%.2f", order.totalPrice)}",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -215,10 +424,8 @@ fun AssignedOrderCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Status Badge
             Surface(
                 color = when (order.status) {
-                    OrderStatus.READY_FOR_PICKUP -> MaterialTheme.colorScheme.tertiary
                     OrderStatus.OUT_FOR_DELIVERY -> MaterialTheme.colorScheme.primary
                     OrderStatus.DELIVERED -> MaterialTheme.colorScheme.outline
                     else -> MaterialTheme.colorScheme.secondary
@@ -226,7 +433,11 @@ fun AssignedOrderCard(
                 shape = MaterialTheme.shapes.small
             ) {
                 Text(
-                    text = order.status.toString(),
+                    text = when (order.status) {
+                        OrderStatus.OUT_FOR_DELIVERY -> "🚚 OUT FOR DELIVERY"
+                        OrderStatus.DELIVERED -> "✓ DELIVERED"
+                        else -> order.status.toString()
+                    },
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimary
@@ -235,12 +446,11 @@ fun AssignedOrderCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Text("Delivery: ${order.deliveryAddress}")
-            Text("Items: ${order.items.size}")
+            Text("📍 ${order.deliveryAddress}")
+            Text("📦 ${order.items.size} items")
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Item Details
             order.items.forEach { item ->
                 Text(
                     "• ${item.quantity}x ${item.productName}",
@@ -250,7 +460,6 @@ fun AssignedOrderCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action Buttons based on status
             when (order.status) {
                 OrderStatus.READY_FOR_PICKUP -> {
                     Button(
@@ -270,14 +479,12 @@ fun AssignedOrderCard(
                 }
                 OrderStatus.DELIVERED -> {
                     Text(
-                        "✓ Delivered",
+                        "✓ Completed",
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
-                else -> {
-                    // No action needed
-                }
+                else -> {}
             }
         }
     }

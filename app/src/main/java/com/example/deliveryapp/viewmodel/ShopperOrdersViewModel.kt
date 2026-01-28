@@ -16,7 +16,7 @@ data class ShopperOrdersUiState(
 )
 
 class ShopperOrdersViewModel : ViewModel() {
-    private val orderRepository = OrderRepository()
+    private val orderRepository = OrderRepository.getInstance() // Use singleton
 
     private val _uiState = MutableStateFlow(ShopperOrdersUiState())
     val uiState: StateFlow<ShopperOrdersUiState> = _uiState.asStateFlow()
@@ -32,7 +32,12 @@ class ShopperOrdersViewModel : ViewModel() {
             orderRepository.getOrdersForShopper("shopper1")
                 .onSuccess { orders ->
                     _uiState.value = _uiState.value.copy(
-                        orders = orders,
+                        orders = orders.sortedByDescending { it.createdAt },
+                        isLoading = false
+                    )
+                }
+                .onFailure { exception ->
+                    _uiState.value = _uiState.value.copy(
                         isLoading = false
                     )
                 }
@@ -42,7 +47,11 @@ class ShopperOrdersViewModel : ViewModel() {
     fun cancelOrder(orderId: String) {
         viewModelScope.launch {
             orderRepository.updateOrderStatus(orderId, OrderStatus.CANCELLED)
-                .onSuccess { loadOrders() }
+                .onSuccess {
+                    loadOrders()
+                }
+                .onFailure { exception ->
+                }
         }
     }
 }

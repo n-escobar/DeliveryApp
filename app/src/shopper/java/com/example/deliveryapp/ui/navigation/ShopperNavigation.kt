@@ -3,6 +3,7 @@ package com.example.deliveryapp.ui.navigation
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
@@ -17,7 +18,8 @@ import com.example.deliveryapp.ui.screens.*
 import com.example.deliveryapp.viewmodel.ProductSearchViewModel
 
 sealed class ShopperScreen(val route: String, val title: String) {
-    object ProductSearch : ShopperScreen("products", "Products")
+    object CategoryBrowse : ShopperScreen("category_browse", "Browse")
+    object ProductSearch : ShopperScreen("products", "Search")
     object Orders : ShopperScreen("orders", "My Orders")
     object ProductDetail : ShopperScreen("product_detail/{productId}", "Product Details") {
         fun createRoute(productId: String) = "product_detail/$productId"
@@ -45,8 +47,20 @@ fun ShopperNavigation() {
             if (showBottomBar) {
                 NavigationBar {
                     NavigationBarItem(
-                        icon = { Icon(Icons.Default.ShoppingCart, "Products") },
-                        label = { Text("Products") },
+                        icon = { Icon(Icons.Default.Star, "Browse") },
+                        label = { Text("Browse") },
+                        selected = currentRoute == ShopperScreen.CategoryBrowse.route,
+                        onClick = {
+                            navController.navigate(ShopperScreen.CategoryBrowse.route) {
+                                popUpTo(navController.graph.startDestinationId)
+                                launchSingleTop = true
+                            }
+                        }
+                    )
+
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.ShoppingCart, "Search") },
+                        label = { Text("Search") },
                         selected = currentRoute == ShopperScreen.ProductSearch.route,
                         onClick = {
                             navController.navigate(ShopperScreen.ProductSearch.route) {
@@ -73,16 +87,27 @@ fun ShopperNavigation() {
     ) { padding ->
         NavHost(
             navController = navController,
-            startDestination = ShopperScreen.ProductSearch.route,
+            startDestination = ShopperScreen.CategoryBrowse.route,
             modifier = Modifier.padding(padding)
         ) {
-            composable(ShopperScreen.ProductSearch.route) {
-                ProductSearchScreen(
-                    viewModel = productSearchViewModel,  // Pass the same instance
+            composable(ShopperScreen.CategoryBrowse.route) {
+                CategoryBrowseScreen(
                     onProductClick = { productId ->
                         navController.navigate(ShopperScreen.ProductDetail.createRoute(productId))
                     },
-                    onNavigateToOrders = {  // ← ADD THIS
+                    onAddToCart = { product, quantity ->
+                        productSearchViewModel.addToCart(product, quantity)
+                    }
+                )
+            }
+
+            composable(ShopperScreen.ProductSearch.route) {
+                ProductSearchScreen(
+                    viewModel = productSearchViewModel,
+                    onProductClick = { productId ->
+                        navController.navigate(ShopperScreen.ProductDetail.createRoute(productId))
+                    },
+                    onNavigateToOrders = {
                         navController.navigate(ShopperScreen.Orders.route) {
                             popUpTo(ShopperScreen.ProductSearch.route) {
                                 inclusive = false
@@ -107,7 +132,7 @@ fun ShopperNavigation() {
                     productId = productId,
                     onNavigateBack = { navController.popBackStack() },
                     onAddToCart = { product, quantity ->
-                        productSearchViewModel.addToCart(product, quantity)  // Uses same instance
+                        productSearchViewModel.addToCart(product, quantity)
                     }
                 )
             }

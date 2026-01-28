@@ -11,14 +11,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 data class DelivererOrdersUiState(
-    val assignedOrders: List<Order> = emptyList(),
-    val availableOrders: List<Order> = emptyList(),
+    val pendingOrders: List<Order> = emptyList(),        // Orders to prepare
+    val availableOrders: List<Order> = emptyList(),      // Ready for pickup
+    val assignedOrders: List<Order> = emptyList(),       // My deliveries
     val isLoading: Boolean = false,
     val error: String? = null
 )
 
 class DelivererOrdersViewModel : ViewModel() {
-    private val orderRepository = OrderRepository()
+    private val orderRepository = OrderRepository.getInstance()
     private val currentDelivererId = "deliverer1"
 
     private val _uiState = MutableStateFlow(DelivererOrdersUiState())
@@ -32,11 +33,13 @@ class DelivererOrdersViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
+            val pendingResult = orderRepository.getPendingOrders()
             val availableResult = orderRepository.getAvailableOrdersForDelivery()
             val assignedResult = orderRepository.getOrdersForDeliverer(currentDelivererId)
 
-            if (availableResult.isSuccess && assignedResult.isSuccess) {
+            if (pendingResult.isSuccess && availableResult.isSuccess && assignedResult.isSuccess) {
                 _uiState.value = _uiState.value.copy(
+                    pendingOrders = pendingResult.getOrNull() ?: emptyList(),
                     availableOrders = availableResult.getOrNull() ?: emptyList(),
                     assignedOrders = assignedResult.getOrNull() ?: emptyList(),
                     isLoading = false
@@ -50,6 +53,20 @@ class DelivererOrdersViewModel : ViewModel() {
         }
     }
 
+    // Preparation stage progressions (manual control)
+    fun confirmOrder(orderId: String) {
+        updateOrderStatus(orderId, OrderStatus.CONFIRMED)
+    }
+
+    fun startPreparing(orderId: String) {
+        updateOrderStatus(orderId, OrderStatus.PREPARING)
+    }
+
+    fun markReadyForPickup(orderId: String) {
+        updateOrderStatus(orderId, OrderStatus.READY_FOR_PICKUP)
+    }
+
+    // Delivery stage actions
     fun acceptOrder(orderId: String) {
         viewModelScope.launch {
             orderRepository.assignDeliverer(orderId, currentDelivererId)
@@ -80,5 +97,9 @@ class DelivererOrdersViewModel : ViewModel() {
                     )
                 }
         }
+    }
+
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(error = null)
     }
 }

@@ -128,7 +128,7 @@ fun ProductSearchScreen(
                             // Place Order Button
                             Button(
                                 onClick = {
-                                    viewModel.placeOrder("shopper1", "123 Main St")
+                                    viewModel.placeOrder("123 Main St")
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 enabled = !uiState.isLoading

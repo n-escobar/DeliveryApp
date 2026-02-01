@@ -8,7 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.*
 import com.example.deliveryapp.DelivererOrdersScreen
-import com.example.deliveryapp.ui.screens.*
+import com.example.deliveryapp.auth.AuthManager
 
 sealed class DelivererScreen(val route: String, val title: String) {
     object Deliveries : DelivererScreen("deliveries", "Deliveries")
@@ -17,6 +17,11 @@ sealed class DelivererScreen(val route: String, val title: String) {
 @Composable
 fun DelivererNavigation() {
     val navController = rememberNavController()
+
+    //Following 2 variables are from RA3, flavors auth. prompt
+    val authManager = remember { AuthManager.getInstance() }
+    // Get current user ID for queries
+    val userId = authManager.getCurrentUserId() ?: ""
 
     Scaffold(
         bottomBar = {

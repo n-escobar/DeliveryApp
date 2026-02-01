@@ -1,26 +1,93 @@
 package com.example.deliveryapp
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
+import com.example.deliveryapp.auth.AuthManager
+import com.example.deliveryapp.auth.AuthState
+import com.example.deliveryapp.auth.UserRole
 import com.example.deliveryapp.ui.navigation.ShopperNavigation
+import com.example.deliveryapp.ui.screens.LoginScreen
+import com.example.deliveryapp.ui.screens.SignUpScreen
 import com.example.deliveryapp.ui.theme.DeliveryAppTheme
+import com.google.firebase.messaging.FirebaseMessaging
 
 class ShopperActivity : ComponentActivity() {
+
+    private val authManager = AuthManager.getInstance()
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            getFcmToken()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Request notification permission for Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestPermissionLauncher.launch(
+                android.Manifest.permission.POST_NOTIFICATIONS
+            )
+        } else {
+            getFcmToken()
+        }
+
         setContent {
             DeliveryAppTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    ShopperNavigation()
-                }
+                ShopperAuthFlow()
+            }
+        }
+    }
+
+    @Composable
+    fun ShopperAuthFlow() {
+        val authState by authManager.authState.collectAsState()
+        var showSignUp by remember { mutableStateOf(false) }
+
+        when {
+            authState is AuthState.Authenticated -> {
+                // User is logged in - show main app
+                ShopperNavigation()
+            }
+            showSignUp -> {
+                // Show sign up screen
+                SignUpScreen(
+                    userRole = UserRole.SHOPPER,
+                    onSignUpSuccess = {
+                        showSignUp = false
+                    },
+                    onNavigateBack = {
+                        showSignUp = false
+                    }
+                )
+            }
+            else -> {
+                // Show login screen
+                LoginScreen(
+                    userRole = UserRole.SHOPPER,
+                    onLoginSuccess = {
+                        // Auth state will update automatically
+                    },
+                    onNavigateToSignUp = {
+                        showSignUp = true
+                    }
+                )
+            }
+        }
+    }
+
+    private fun getFcmToken() {
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val token = task.result
+                // Save token via AuthManager
             }
         }
     }

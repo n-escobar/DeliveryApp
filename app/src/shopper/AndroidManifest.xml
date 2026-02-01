@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application>
-        <!-- Override app label from main manifest -->
         <activity
             android:name=".ShopperActivity"
             android:exported="true"
-            android:label="Delivery Shop"
+            android:label="@string/app_name"
             android:theme="@style/Theme.DeliveryApp">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -15,5 +16,4 @@
             </intent-filter>
         </activity>
     </application>
-
 </manifest>

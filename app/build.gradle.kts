@@ -2,6 +2,9 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+
+    // Add the Google services Gradle plugin
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -30,10 +33,10 @@ android {
 
             // Custom configuration
             manifestPlaceholders["appName"] = "Delivery Shop"
-            buildConfigField("String", "USER_TYPE", "\"SHOPPER\"")
+            //buildConfigField("String", "USER_TYPE", "\"SHOPPER\"")
 
             // Optional: different version code for tracking
-            versionCode = 1
+            //versionCode = 1
         }
 
         create("deliverer") {
@@ -42,9 +45,9 @@ android {
             versionNameSuffix = "-deliverer"
 
             manifestPlaceholders["appName"] = "Delivery Driver"
-            buildConfigField("String", "USER_TYPE", "\"DELIVERER\"")
+            //buildConfigField("String", "USER_TYPE", "\"DELIVERER\"")
 
-            versionCode = 2
+            //versionCode = 2
         }
     }
 
@@ -115,4 +118,53 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation("androidx.arch.core:core-testing:2.2.0")
+
+    // Optional but recommended
+    testImplementation("io.mockk:mockk:1.13.8")  // For mocking
+    testImplementation("app.cash.turbine:turbine:1.0.0")  // For Flow testing
+    testImplementation("com.google.truth:truth:1.1.5")  // Better assertions
+
+    /*DEPENDENCIES DIRECTLY PROVIDED BY FIREBASE WHEN SETTING UP PROJECT
+
+    //Import the Firebase BoM
+    implementation(platform("com.google.firebase:firebase-bom:34.8.0"))
+
+    // TODO: Add the dependencies for Firebase products you want to use
+    // When using the BoM, don't specify versions in Firebase dependencies
+    implementation("com.google.firebase:firebase-analytics")
+
+    // Add the dependencies for any other desired Firebase products
+    // https://firebase.google.com/docs/android/setup#available-libraries*/
+
+    // ═══════════════════════════════════════════════════
+    // FIREBASE DEPENDENCIES (from RA3 comprehensive Firebase guide artifact)
+    // ═══════════════════════════════════════════════════
+
+    // Firebase BoM (Bill of Materials) - manages versions
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+
+    // Firebase Analytics
+    implementation("com.google.firebase:firebase-analytics-ktx")
+
+    // Firebase Authentication
+    implementation("com.google.firebase:firebase-auth-ktx")
+
+    // Firestore Database
+    implementation("com.google.firebase:firebase-firestore-ktx")
+
+    // Realtime Database (alternative to Firestore)
+    // implementation("com.google.firebase:firebase-database-ktx")
+
+    // Cloud Storage
+    implementation("com.google.firebase:firebase-storage-ktx")
+
+    // Cloud Messaging (Push Notifications)
+    implementation("com.google.firebase:firebase-messaging-ktx")
+
+    // Firebase UI for Auth (optional, makes auth easier)
+    implementation("com.firebaseui:firebase-ui-auth:8.0.2")
+
+    // Coroutines Play Services (for Firebase + Coroutines)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 }
+

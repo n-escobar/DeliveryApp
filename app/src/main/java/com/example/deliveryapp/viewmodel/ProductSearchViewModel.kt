@@ -3,11 +3,12 @@ package com.example.deliveryapp.viewmodel
 import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.deliveryapp.auth.AuthManager
 import com.example.deliveryapp.data.model.Order
 import com.example.deliveryapp.data.model.OrderItem
 import com.example.deliveryapp.data.model.OrderStatus
 import com.example.deliveryapp.data.model.Product
-import com.example.deliveryapp.data.repository.OrderRepository
+import com.example.deliveryapp.data.repository.FirestoreOrderRepository
 import com.example.deliveryapp.data.repository.ProductRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +28,9 @@ data class ProductSearchUiState(
 
 class ProductSearchViewModel : ViewModel() {
     private val productRepository = ProductRepository()
-    private val orderRepository = OrderRepository.getInstance() // Use singleton
+    // Use Firestore repository instead of in-memory
+    private val orderRepository = FirestoreOrderRepository.getInstance()
+    private val authManager = AuthManager.getInstance()
 
     private val _uiState = MutableStateFlow(ProductSearchUiState())
     val uiState: StateFlow<ProductSearchUiState> = _uiState.asStateFlow()
@@ -83,9 +86,9 @@ class ProductSearchViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(cart = currentCart)
     }
 
-    fun placeOrder(shopperId: String, deliveryAddress: String) {
+    // ... rest of the code stays the same, but update placeOrder:
+    fun placeOrder(deliveryAddress: String) {
         viewModelScope.launch {
-            // Validate cart is not empty
             if (_uiState.value.cart.isEmpty()) {
                 _uiState.value = _uiState.value.copy(
                     error = "Cart is empty"
@@ -93,22 +96,28 @@ class ProductSearchViewModel : ViewModel() {
                 return@launch
             }
 
+            // Get current user ID
+            val userId = authManager.getCurrentUserId() ?: run {
+                _uiState.value = _uiState.value.copy(
+                    error = "Not logged in"
+                )
+                return@launch
+            }
+
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             val order = Order(
-                    orderId = "ORD${System.currentTimeMillis()}",
-                    shopperId = shopperId,
-                    items = _uiState.value.cart,
-                    status = OrderStatus.PENDING,
-                    totalPrice = _uiState.value.cart.sumOf { it.subtotal },
-                    deliveryAddress = deliveryAddress,
-                    createdAt = Instant.now()
-                )
-
+                orderId = "ORD${System.currentTimeMillis()}",
+                shopperId = userId,  // Use actual user ID
+                items = _uiState.value.cart,
+                status = OrderStatus.PENDING,
+                totalPrice = _uiState.value.cart.sumOf { it.subtotal },
+                deliveryAddress = deliveryAddress,
+                createdAt = Instant.now()
+            )
 
             orderRepository.createOrder(order)
                 .onSuccess { createdOrder ->
-
                     _uiState.value = _uiState.value.copy(
                         cart = emptyList(),
                         isLoading = false,
@@ -117,7 +126,6 @@ class ProductSearchViewModel : ViewModel() {
                     )
                 }
                 .onFailure { exception ->
-
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         error = exception.message ?: "Failed to place order"

@@ -16,6 +16,7 @@ import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.example.deliveryapp.ui.screens.*
 import com.example.deliveryapp.viewmodel.ProductSearchViewModel
+import com.example.deliveryapp.auth.AuthManager
 
 sealed class ShopperScreen(val route: String, val title: String) {
     object CategoryBrowse : ShopperScreen("category_browse", "Browse")
@@ -38,6 +39,11 @@ fun ShopperNavigation() {
     val productSearchViewModel: ProductSearchViewModel = viewModel(
         viewModelStoreOwner = activity ?: error("Activity not found")
     )
+
+    //Following 2 variables are from RA3, flavors auth. prompt
+    val authManager = remember { AuthManager.getInstance() }
+    // Get current user ID for queries
+    val userId = authManager.getCurrentUserId() ?: ""
 
     Scaffold(
         bottomBar = {
